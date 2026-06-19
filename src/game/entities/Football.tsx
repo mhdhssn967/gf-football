@@ -92,7 +92,17 @@ export const Football: React.FC<FootballProps> = ({
     return () => {
       window.removeEventListener('reset-game', handleResetGame)
     }
-  }, [position])
+  }, [position[0], position[1], position[2]])
+
+  // Instantly teleport ball when the starting position changes (level loads)
+  useEffect(() => {
+    if (rigidBodyRef.current) {
+      rigidBodyRef.current.setTranslation({ x: position[0], y: position[1], z: position[2] }, true)
+      rigidBodyRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      rigidBodyRef.current.setAngvel({ x: 0, y: 0, z: 0 }, true)
+      isMovingRef.current = false
+    }
+  }, [position[0], position[1], position[2]])
 
   useFrame(() => {
     if (!rigidBodyRef.current) return
@@ -154,6 +164,7 @@ export const Football: React.FC<FootballProps> = ({
         linearDamping={0.8} // grass resistance
         angularDamping={0.8}
         name="football"
+        ccd={true}
         onCollisionEnter={handleBallCollision}
       >
         <BallCollider args={[0.11]} />

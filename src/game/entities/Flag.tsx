@@ -1,4 +1,5 @@
 import React from 'react'
+import { RigidBody } from '@react-three/rapier'
 
 export type CountryCode = 'BR' | 'ES' | 'FR' | 'AR' | 'DE'
 
@@ -10,21 +11,21 @@ interface FlagProps {
 
 export const Flag: React.FC<FlagProps> = ({ country, position, rotationY = 0 }) => {
   return (
-    <group position={position} rotation={[0, rotationY, 0]}>
+    <RigidBody type="fixed" colliders="hull" position={position} rotation={[0, rotationY, 0]}>
       {/* Flagpole */}
-      <mesh castShadow position={[0, 1.5, 0]}>
-        <cylinderGeometry args={[0.04, 0.05, 3, 8]} />
+      <mesh castShadow position={[0, 0.7, 0]}>
+        <cylinderGeometry args={[0.02, 0.025, 1.4, 8]} />
         <meshStandardMaterial color="#8a7e72" roughness={0.4} />
       </mesh>
       
       {/* Flag Finial (gold ball at the top) */}
-      <mesh position={[0, 3.05, 0]}>
-        <sphereGeometry args={[0.08, 8, 8]} />
+      <mesh position={[0, 1.42, 0]}>
+        <sphereGeometry args={[0.04, 8, 8]} />
         <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.2} />
       </mesh>
-
+ 
       {/* Flag Fabric Banners */}
-      <group position={[0.45, 2.4, 0]}>
+      <group position={[0.22, 1.1, 0]} scale={[0.5, 0.5, 0.5]}>
         {/* FRANCE (Vertical Blue, White, Red bands) */}
         {country === 'FR' && (
           <group>
@@ -135,7 +136,7 @@ export const Flag: React.FC<FlagProps> = ({ country, position, rotationY = 0 }) 
           </group>
         )}
       </group>
-    </group>
+    </RigidBody>
   )
 }
 

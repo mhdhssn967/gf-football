@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useImperativeHandle } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF, useAnimations } from '@react-three/drei'
 import * as THREE from 'three'
+import { useGameStore } from '@/stores/useGameStore'
+import { LEVELS } from '@/levels/levelsConfig'
 
 interface RaccoonProps {
   position: [number, number, number]
@@ -64,7 +66,7 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
     return () => {
       if (idleAction) idleAction.fadeOut(0.2)
     }
-  }, [position, rotationY, actions])
+  }, [position[0], position[1], position[2], rotationY, actions])
 
   // Listen for reset-game event to return raccoon back to starting position
   useEffect(() => {
@@ -86,7 +88,7 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
     return () => {
       window.removeEventListener('reset-game', handleResetGame)
     }
-  }, [position, rotationY, actions])
+  }, [position[0], position[1], position[2], rotationY, actions])
 
   // Trigger specific kick animation when the trigger-kick event is dispatched
   useEffect(() => {
@@ -277,6 +279,75 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
     
     currentOffsetRef.current.x += (targetOffsetRef.current.x - currentOffsetRef.current.x) * lerpSpeed * delta
     currentOffsetRef.current.z += (targetOffsetRef.current.z - currentOffsetRef.current.z) * lerpSpeed * delta
+
+    // A. Boundary constraints (clamped inside the brick walls clearance)
+    basePositionRef.current.x = Math.max(-4.1, Math.min(4.1, basePositionRef.current.x))
+    basePositionRef.current.z = Math.max(-9.1, Math.min(11.1, basePositionRef.current.z))
+
+    // B. Level Obstacles collision resolution (AABB overlap check)
+    const currentLevelIndex = useGameStore.getState().currentLevelIndex
+    const currentLevel = LEVELS[currentLevelIndex]
+    const obstacles = currentLevel ? currentLevel.obstacles : []
+    obstacles.forEach(obs => {
+      let obsX = obs.position[0]
+      const obsZ = obs.position[2]
+      if (obs.type === 'moving') {
+        const speed = 2.0
+        const range = 4.0
+        const t = _state.clock.getElapsedTime()
+        obsX = obs.position[0] + Math.sin(t * speed) * range
+      }
+      const halfX = obs.size[0] / 2 + 0.32
+      const halfZ = obs.size[2] / 2 + 0.32
+
+      const dx = basePositionRef.current.x - obsX
+      const dz = basePositionRef.current.z - obsZ
+
+      const overlapX = halfX - Math.abs(dx)
+      const overlapZ = halfZ - Math.abs(dz)
+
+      if (overlapX > 0 && overlapZ > 0) {
+        if (overlapX < overlapZ) {
+          basePositionRef.current.x += dx > 0 ? overlapX : -overlapX
+        } else {
+          basePositionRef.current.z += dz > 0 ? overlapZ : -overlapZ
+        }
+      }
+    })
+
+    // C. Scenic Rocks collision resolution (Circle overlap check)
+    const scenicCircles = [
+      { x: -3.1, z: 2.5, r: 1.0 }, // Left rock group
+      { x: 2.7, z: -5.6, r: 0.9 }  // Right rock group
+    ]
+    scenicCircles.forEach(circle => {
+      const dx = basePositionRef.current.x - circle.x
+      const dz = basePositionRef.current.z - circle.z
+      const dist = Math.hypot(dx, dz)
+      if (dist < circle.r) {
+        const overlap = circle.r - dist
+        const angle = dist > 0.001 ? Math.atan2(dx, dz) : 0
+        basePositionRef.current.x += Math.sin(angle) * overlap
+        basePositionRef.current.z += Math.cos(angle) * overlap
+      }
+    })
+
+    // D. Left Fence collision resolution (AABB overlap check)
+    const fenceX = -2.0
+    const fenceZ = 4.5
+    const fenceHalfX = 1.3
+    const fenceHalfZ = 0.5
+    const fdx = basePositionRef.current.x - fenceX
+    const fdz = basePositionRef.current.z - fenceZ
+    const fOverlapX = fenceHalfX - Math.abs(fdx)
+    const fOverlapZ = fenceHalfZ - Math.abs(fdz)
+    if (fOverlapX > 0 && fOverlapZ > 0) {
+      if (fOverlapX < fOverlapZ) {
+        basePositionRef.current.x += fdx > 0 ? fOverlapX : -fOverlapX
+      } else {
+        basePositionRef.current.z += fdz > 0 ? fOverlapZ : -fOverlapZ
+      }
+    }
 
     if (groupRef.current) {
       groupRef.current.position.set(

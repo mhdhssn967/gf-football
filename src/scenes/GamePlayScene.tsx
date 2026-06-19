@@ -1,15 +1,62 @@
 import React, { useLayoutEffect, useRef, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
-
 import * as THREE from 'three'
 import { OrbitControls, useTexture, Sky, Stars } from '@react-three/drei'
 import { Physics, RigidBody } from '@react-three/rapier'
+import type { RapierRigidBody } from '@react-three/rapier'
 import Football from '@/game/entities/Football'
 import Raccoon from '@/game/entities/Raccoon'
+import GoalPost from '@/game/entities/ProceduralGoalPost'
 import BoundaryWall from '@/game/components/BoundaryWall'
+import GameEnvironment from '@/game/components/GameEnvironment'
 import groundTextureUrl from '@/assets/textures/ground.png'
+import { useGameStore } from '@/stores/useGameStore'
+import { LEVELS } from '@/levels/levelsConfig'
+import type { ObstacleConfig } from '@/levels/levelsConfig'
+
+const Obstacle: React.FC<{ config: ObstacleConfig }> = ({ config }) => {
+  const rigidBodyRef = useRef<RapierRigidBody>(null)
+  const initialX = config.position[0]
+
+  useFrame((state) => {
+    if (config.type === 'moving' && rigidBodyRef.current) {
+      // Move back and forth on X axis
+      const speed = 2.0
+      const range = 4.0
+      const t = state.clock.getElapsedTime()
+      const newX = initialX + Math.sin(t * speed) * range
+      rigidBodyRef.current.setNextKinematicTranslation({
+        x: newX,
+        y: config.position[1],
+        z: config.position[2]
+      })
+    }
+  })
+
+  return (
+    <RigidBody
+      ref={rigidBodyRef}
+      type={config.type === 'moving' ? 'kinematicPosition' : 'fixed'}
+      colliders="cuboid"
+      position={config.position}
+      rotation={config.rotation}
+    >
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={config.size} />
+        <meshStandardMaterial 
+          color={config.type === 'moving' ? '#f43f5e' : '#fb923c'} 
+          roughness={0.4} 
+          metalness={0.2}
+        />
+      </mesh>
+    </RigidBody>
+  )
+}
 
 export const GamePlayScene: React.FC = () => {
+  const currentLevelIndex = useGameStore((state) => state.currentLevelIndex)
+  const currentLevel = LEVELS[currentLevelIndex] || LEVELS[0]
+
   const footballRef = useRef<{ 
     kick: (impulse: THREE.Vector3) => void 
     reset: () => void 
@@ -28,6 +75,7 @@ export const GamePlayScene: React.FC = () => {
   // Refs for aiming indicators (trajectory and ground guide dots)
   const trajectoryDotsRef = useRef<THREE.Mesh[]>([])
   const groundDotsRef = useRef<THREE.Mesh[]>([])
+  const raycasterRef = useRef(new THREE.Raycaster())
 
   // Load and configure ground grass texture mapping
   const groundTexture = useTexture(groundTextureUrl, (texture) => {
@@ -284,21 +332,119 @@ export const GamePlayScene: React.FC = () => {
         const activeTrajCount = Math.round(2 + powerFraction * 28)
         const activeGroundCount = Math.round(2 + powerFraction * 18)
 
-        // 1. Calculate and display 3D flight trajectory curve
+        // 1. Calculate and display 3D flight trajectory curve (with recursive bouncing!)
+        const raycaster = raycasterRef.current
+        const bounciness = 0.55 // Restitution of the ball
+        const ballRadius = 0.11
+
+        let currentPos = ballPos.clone()
+        let currentVel = v0.clone()
+        const dt = 0.08 // Time step per dot spacing
+        const computedPositions: THREE.Vector3[] = []
+
+        for (let i = 0; i < activeTrajCount; i++) {
+          let timeRemaining = dt
+          let bounceCount = 0
+
+          while (timeRemaining > 0.001 && bounceCount < 3) {
+            // Apply gravity over this time step
+            const stepVel = currentVel.clone()
+            stepVel.y -= 9.81 * timeRemaining
+
+            // Average velocity for the segment
+            const avgVel = currentVel.clone().add(stepVel).multiplyScalar(0.5)
+            const displacement = avgVel.clone().multiplyScalar(timeRemaining)
+            const dist = displacement.length()
+
+            if (dist > 0.001) {
+              const dir = displacement.clone().normalize()
+              raycaster.set(currentPos, dir)
+              // Raycast slightly farther than step distance to handle radius buffer
+              raycaster.far = dist + ballRadius
+
+              const intersects = raycaster.intersectObjects(state.scene.children, true)
+
+              // Find first valid environmental collision target
+              const validHit = intersects.find(hit => {
+                const name = hit.object.name || ''
+                
+                // Exclude trajectory guide elements and invisible trackers
+                if (
+                  name.includes('traj') || 
+                  name.includes('ground') || 
+                  name.includes('guide') ||
+                  name.includes('tracker') ||
+                  name.includes('slingshot') ||
+                  hit.object.visible === false
+                ) {
+                  return false
+                }
+
+                // Ignore raccoon player meshes
+                let p = hit.object.parent
+                while (p) {
+                  const parentName = p.name ? p.name.toLowerCase() : ''
+                  if (parentName.includes('raccoon')) return false
+                  if (parentName.includes('football')) return false // Ignore ball itself
+                  p = p.parent
+                }
+
+                return true
+              })
+
+              if (validHit && validHit.distance > ballRadius) {
+                // Determine contact point and offset along the hit surface normal
+                const contactDist = Math.max(0, validHit.distance - ballRadius)
+                const fraction = contactDist / dist
+
+                currentPos.addScaledVector(displacement, fraction)
+
+                // Retrieve collision normal and rotate to world coordinates
+                const hitNormal = validHit.face!.normal.clone()
+                hitNormal.transformDirection(validHit.object.matrixWorld)
+
+                // Reflect velocity vector
+                const dotVal = currentVel.dot(hitNormal)
+                currentVel.sub(hitNormal.multiplyScalar(2 * dotVal)).multiplyScalar(bounciness)
+
+                // Process remaining displacement segment
+                timeRemaining *= (1 - fraction)
+                bounceCount++
+              } else {
+                currentPos.add(displacement)
+                currentVel.copy(stepVel)
+                timeRemaining = 0
+              }
+            } else {
+              timeRemaining = 0
+            }
+          }
+
+          // Apply step gravity
+          currentVel.y -= 9.81 * dt
+
+          // Collide with grass ground floor
+          if (currentPos.y < ballRadius) {
+            currentPos.y = ballRadius
+            currentVel.y = -currentVel.y * bounciness
+            currentVel.x *= 0.9
+            currentVel.z *= 0.9
+          }
+
+          computedPositions.push(currentPos.clone())
+        }
+
+        // Apply path to trajectory dot meshes
         trajectoryDotsRef.current.forEach((dot, index) => {
           if (dot) {
             if (dot.material) {
               (dot.material as THREE.MeshBasicMaterial).color.copy(color)
             }
 
-            if (index < activeTrajCount) {
-              const time = index * 0.08
-              const x = ballPos.x + v0.x * time
-              const y = ballPos.y + v0.y * time - 0.5 * 9.81 * time * time
-              const z = ballPos.z + v0.z * time
-
-              if (y >= 0.11) {
-                dot.position.set(x, y, z)
+            if (index < activeTrajCount && index < computedPositions.length) {
+              const pt = computedPositions[index]
+              if (pt.y >= 0.11) {
+                dot.position.copy(pt)
                 dot.visible = true
               } else {
                 dot.visible = false
@@ -309,15 +455,45 @@ export const GamePlayScene: React.FC = () => {
           }
         })
 
-        // 2. Calculate and display 2D flat ground direction guide
+        // 2. Calculate and display 2D flat ground direction guide (stop at first obstacle)
+        let groundObstacleDistance = 999
+        raycaster.set(ballPos, dirNorm)
+        raycaster.far = activeGroundCount * 0.45
+        const groundIntersects = raycaster.intersectObjects(state.scene.children, true)
+        const validGroundHit = groundIntersects.find(hit => {
+          const name = hit.object.name || ''
+          if (
+            name.includes('traj') || 
+            name.includes('ground') || 
+            name.includes('guide') ||
+            name.includes('tracker') ||
+            name.includes('slingshot') ||
+            hit.object.visible === false
+          ) {
+            return false
+          }
+          let p = hit.object.parent
+          while (p) {
+            const parentName = p.name ? p.name.toLowerCase() : ''
+            if (parentName.includes('raccoon')) return false
+            if (parentName.includes('football')) return false
+            p = p.parent
+          }
+          return true
+        })
+
+        if (validGroundHit) {
+          groundObstacleDistance = Math.max(0, validGroundHit.distance - ballRadius)
+        }
+
         groundDotsRef.current.forEach((dot, index) => {
           if (dot) {
             if (dot.material) {
               (dot.material as THREE.MeshBasicMaterial).color.copy(color)
             }
 
-            if (index < activeGroundCount) {
-              const stepDistance = index * 0.45
+            const stepDistance = index * 0.45
+            if (index < activeGroundCount && stepDistance < groundObstacleDistance) {
               const x = ballPos.x + dirNorm.x * stepDistance
               const y = 0.02
               const z = ballPos.z + dirNorm.z * stepDistance
@@ -422,7 +598,7 @@ export const GamePlayScene: React.FC = () => {
         <directionalLight
           castShadow
           position={[25, 30, 20]}
-          intensity={1.5}
+          intensity={1.6}
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
           shadow-camera-far={100}
@@ -432,9 +608,9 @@ export const GamePlayScene: React.FC = () => {
           shadow-camera-bottom={-20}
           shadow-bias={-0.0002}
         />
-        <ambientLight intensity={0.55} />
+        <ambientLight intensity={0.65} />
         <hemisphereLight 
-          args={['#fef08a', '#14532d', 0.45]} 
+          args={['#fef08a', '#14532d', 0.55]} 
         />
         
         {/* Ground Collision Base */}
@@ -461,6 +637,7 @@ export const GamePlayScene: React.FC = () => {
             key={`traj-${i}`} 
             ref={(el) => { if (el) trajectoryDotsRef.current[i] = el }}
             visible={false}
+            name="trajectory-dot"
           >
             <sphereGeometry args={[0.07, 8, 8]} />
             <meshBasicMaterial color="#f43f5e" toneMapped={false} />
@@ -474,6 +651,7 @@ export const GamePlayScene: React.FC = () => {
             ref={(el) => { if (el) groundDotsRef.current[i] = el }}
             visible={false}
             rotation={[-Math.PI / 2, 0, 0]}
+            name="ground-dot"
           >
             <ringGeometry args={[0.02, 0.06, 16]} />
             <meshBasicMaterial color="#22d3ee" side={THREE.DoubleSide} toneMapped={false} />
@@ -490,20 +668,40 @@ export const GamePlayScene: React.FC = () => {
         {/* Bottom Wall */}
         <BoundaryWall position={[0, 1.0, 22.6]} args={[30.4, 2.0, 0.2]} color="#f43f5e" glowColor="#e11d48" />
 
-        {/* 1. Character Raccoon (Positioned at Z=1.2, facing -Z) */}
+        {/* Level 3D Environment (Forest, path, bridge, river, and flags) */}
+        <GameEnvironment />
+
+        {/* Goal Post */}
+        <GoalPost position={currentLevel.goalPos} />
+
+        {/* Level Obstacles */}
+        {currentLevel.obstacles.map((obs) => (
+          <Obstacle key={obs.id} config={obs} />
+        ))}
+
+        {/* 1. Character Raccoon */}
         <Raccoon 
           ref={raccoonRef}
-          position={[0, 0, 1.2]} 
+          position={[currentLevel.ballStartPos[0], 0, currentLevel.ballStartPos[2] + 1.2]} 
           rotationY={Math.PI} 
           scale={0.8}
         />
 
-        {/* 2. Physics-Simulated Soccer Ball (Positioned at Z=0.0 near the character) */}
+        {/* 2. Physics-Simulated Soccer Ball */}
         <Football 
           ref={footballRef} 
-          position={[0, 0.22, 0]} 
+          position={[currentLevel.ballStartPos[0], 0.22, currentLevel.ballStartPos[2]]} 
           onStop={(ballPos) => {
             window.dispatchEvent(new CustomEvent('run-to-ball', { detail: { x: ballPos.x, z: ballPos.z } }))
+            
+            // Check if player ran out of kicks and hasn't scored
+            setTimeout(() => {
+              const currentPhase = useGameStore.getState().phase
+              const kicks = useGameStore.getState().kicksRemaining
+              if (currentPhase === 'PLAYING' && kicks === 0) {
+                useGameStore.getState().setPhase('GAMEOVER')
+              }
+            }, 1200) // Small delay to let raccoon approach the ball first
           }}
         />
 
