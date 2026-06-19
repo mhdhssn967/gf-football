@@ -127,11 +127,6 @@ const AimSlider: React.FC = () => {
 }
 
 const GameScenePage: React.FC = () => {
-  // Helper to trigger specific kick animations in the character component
-  const triggerKick = (kickName: string) => {
-    window.dispatchEvent(new CustomEvent('trigger-kick', { detail: { name: kickName } }))
-  }
-
   return (
     <div className="game-page-container">
       {/* 3D R3F Viewport */}
@@ -147,14 +142,6 @@ const GameScenePage: React.FC = () => {
             <GamePlayScene />
           </Suspense>
         </Canvas>
-      </div>
-
-      {/* Floating Sidebar containing Kick Animation Buttons */}
-      <div className="kick-controls-sidebar">
-        <button onClick={() => triggerKick('kick5')} className="kick-btn">1</button>
-        <button onClick={() => triggerKick('kick1')} className="kick-btn">2</button>
-        <button onClick={() => triggerKick('kick2')} className="kick-btn">3</button>
-        <button onClick={() => triggerKick('kick3')} className="kick-btn">4</button>
       </div>
 
       {/* Horizontal Slider Control below Canvas */}

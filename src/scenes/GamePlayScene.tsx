@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useRef, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
-import type { ThreeEvent } from '@react-three/fiber'
+
 import * as THREE from 'three'
 import { OrbitControls, useTexture, Sky, Stars } from '@react-three/drei'
 import { Physics, RigidBody } from '@react-three/rapier'
@@ -23,8 +23,6 @@ export const GamePlayScene: React.FC = () => {
 
   // Slingshot drag aiming refs
   const isDraggingRef = useRef(false)
-  const dragStartPointRef = useRef(new THREE.Vector3())
-  const dragCurrentPointRef = useRef(new THREE.Vector3())
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null)
 
   // Refs for aiming indicators (trajectory and ground guide dots)
@@ -340,91 +338,7 @@ export const GamePlayScene: React.FC = () => {
     }
   })
 
-  // Pointer Down Handler: Initializes aiming slingshot
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-    if (footballRef.current && footballRef.current.isMoving()) return
-    e.stopPropagation()
 
-    // Disable OrbitControls rotation and zooming during aiming
-    if (controlsRef.current) {
-      controlsRef.current.enabled = false
-    }
-
-    isDraggingRef.current = true
-    dragStartPointRef.current.copy(e.point)
-    dragCurrentPointRef.current.copy(e.point)
-  }
-
-  // Pointer Move Handler: Calculates live angle & power ratios
-  const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
-    if (!isDraggingRef.current) return
-    e.stopPropagation()
-    dragCurrentPointRef.current.copy(e.point)
-
-    if (footballRef.current) {
-      const ballPos = footballRef.current.getPosition()
-      const dir = dragStartPointRef.current.clone().sub(dragCurrentPointRef.current)
-      const pullLength = dir.length()
-
-      if (pullLength > 0.1) {
-        const dirNorm = dir.clone().normalize()
-        const angle = Math.atan2(dirNorm.x, dirNorm.z)
-
-        // The character orbits exactly 1.2m behind the ball, opposite to kick vector
-        const targetX = ballPos.x - dirNorm.x * 1.2
-        const targetZ = ballPos.z - dirNorm.z * 1.2
-
-        window.dispatchEvent(new CustomEvent('aim-ball', { 
-          detail: { angle, targetX, targetZ } 
-        }))
-      }
-    }
-  }
-
-  // Pointer Up Handler: Releases and triggers the kick
-  const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
-    if (!isDraggingRef.current) return
-    e.stopPropagation()
-    isDraggingRef.current = false
-
-    // Re-enable OrbitControls zoom controls
-    if (controlsRef.current) {
-      controlsRef.current.enabled = true
-    }
-
-    window.dispatchEvent(new CustomEvent('stop-aim-ball'))
-
-    const dir = dragStartPointRef.current.clone().sub(dragCurrentPointRef.current)
-    const pullLength = dir.length()
-
-    // Launch ball only if pull length meets threshold (avoiding noise/taps)
-    if (pullLength > 0.2) {
-      const dirNorm = dir.clone().normalize()
-      
-      const minImpulse = 0.02
-      const maxImpulse = 0.13
-      const t = Math.min(Math.max((pullLength - 0.5) / 3.5, 0), 1)
-      const impulseMagnitude = minImpulse + (maxImpulse - minImpulse) * t
-      
-      const impulseY = impulseMagnitude * 0.15
-      const impulse = new THREE.Vector3(dirNorm.x * impulseMagnitude, impulseY, dirNorm.z * impulseMagnitude)
-
-      // Map animation kick style according to pull back force
-      let kickName = 'kick5' // Short
-      if (t >= 0.33 && t < 0.66) {
-        kickName = 'kick1' // Medium
-      } else if (t >= 0.66) {
-        kickName = 'kick3' // Max
-      }
-
-      window.dispatchEvent(new CustomEvent('trigger-kick', {
-        detail: {
-          name: kickName,
-          customImpulse: impulse
-        }
-      }))
-    }
-  }
 
   // Listen for trigger-kick events to play physics animations on impact frames
   useEffect(() => {

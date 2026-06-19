@@ -375,48 +375,7 @@
   font-weight: 900;
 }
 
-/* Floating Sidebar containing Kick Animation Buttons */
-.kick-controls-sidebar {
-  position: absolute;
-  top: 50%;
-  left: 24px;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  z-index: 100;
-  pointer-events: auto;
-}
 
-.kick-btn {
-  background: linear-gradient(to bottom, #fb923c 0%, #f97316 50%, #ea580c 50%, #c2410c 100%);
-  border: 3px solid #3b2314;
-  border-bottom-width: 5px;
-  border-radius: 50%;
-  color: white;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: inherit;
-  font-weight: 950;
-  font-size: 1.35rem;
-  cursor: pointer;
-  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3), inset 0 2px 0 rgba(255, 255, 255, 0.45);
-  transition: transform 0.05s ease, border-bottom-width 0.05s ease;
-}
-
-.kick-btn:hover {
-  filter: brightness(1.08);
-}
-
-.kick-btn:active {
-  transform: translateY(2px);
-  border-bottom-width: 3px;
-  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.3), inset 0 2px 0 rgba(255, 255, 255, 0.2);
-}
 
 /* Bottom Centered Aim Slider Control */
 .slider-control-container {
