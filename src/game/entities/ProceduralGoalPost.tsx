@@ -58,8 +58,31 @@ export const ProceduralGoalPost: React.FC<ProceduralGoalPostProps> = ({
 
   const handleGoalCollision = (event: CollisionPayload) => {
     if (event.other.rigidBodyObject?.name === 'football') {
-      addScore(100)
-      setPhase('VICTORY')
+      // Get the current position of the ball
+      const ballPos = event.other.rigidBody 
+        ? event.other.rigidBody.translation() 
+        : event.other.rigidBodyObject.position
+
+      // The goal post is located at the position prop
+      const gx = position[0]
+      const gy = position[1]
+      const gz = position[2]
+
+      // Calculate ball position relative to the goal post
+      const localX = ballPos.x - gx
+      const localY = ballPos.y - gy
+      const localZ = ballPos.z - gz
+
+      // Only count as a goal if the ball's center has crossed the goal line (localZ < -0.15)
+      // and it's within the horizontal and vertical bounds of the goal frame
+      const crossedGoalLine = localZ < -0.15
+      const withinWidth = Math.abs(localX) < (width / 2)
+      const withinHeight = localY > 0 && localY < height
+
+      if (crossedGoalLine && withinWidth && withinHeight) {
+        addScore(100)
+        setPhase('VICTORY')
+      }
     }
   }
 
@@ -197,62 +220,87 @@ export const ProceduralGoalPost: React.FC<ProceduralGoalPostProps> = ({
 
 
       {/* --- 3. PHYSICS COLLIDERS --- */}
+      <RigidBody type="fixed" colliders={false}>
+        {/* Left Post Collider */}
+        <CuboidCollider
+          args={[postRadius, height / 2, postRadius]}
+          position={[-width / 2, height / 2, 0]}
+        />
 
-      {/* Left Post Collider */}
-      <RigidBody type="fixed" colliders="cuboid" position={[-width / 2, height / 2, 0]}>
-        <mesh visible={false}>
-          <cylinderGeometry args={[postRadius, postRadius, height, 8]} />
-        </mesh>
+        {/* Right Post Collider */}
+        <CuboidCollider
+          args={[postRadius, height / 2, postRadius]}
+          position={[width / 2, height / 2, 0]}
+        />
+
+        {/* Crossbar Collider */}
+        <CuboidCollider
+          args={[width / 2, postRadius, postRadius]}
+          position={[0, height, 0]}
+        />
+
+        {/* Top Left Support Collider */}
+        <CuboidCollider
+          args={[postRadius, postRadius, depth / 2]}
+          position={[-width / 2, height, -depth / 2]}
+        />
+
+        {/* Top Right Support Collider */}
+        <CuboidCollider
+          args={[postRadius, postRadius, depth / 2]}
+          position={[width / 2, height, -depth / 2]}
+        />
+
+        {/* Bottom Left Support Collider */}
+        <CuboidCollider
+          args={[postRadius, postRadius, depth / 2]}
+          position={[-width / 2, postRadius, -depth / 2]}
+        />
+
+        {/* Bottom Right Support Collider */}
+        <CuboidCollider
+          args={[postRadius, postRadius, depth / 2]}
+          position={[width / 2, postRadius, -depth / 2]}
+        />
+
+        {/* Back Net Physics Collider (Solid Barrier) */}
+        <CuboidCollider
+          args={[width / 2, height / 2, 0.02]}
+          position={[0, height / 2, -depth]}
+        />
+
+        {/* Left Net Physics Collider (Solid Barrier) */}
+        <CuboidCollider
+          args={[0.02, height / 2, depth / 2]}
+          position={[-width / 2, height / 2, -depth / 2]}
+        />
+
+        {/* Right Net Physics Collider (Solid Barrier) */}
+        <CuboidCollider
+          args={[0.02, height / 2, depth / 2]}
+          position={[width / 2, height / 2, -depth / 2]}
+        />
+
+        {/* Top Net Physics Collider (Solid Barrier) */}
+        <CuboidCollider
+          args={[width / 2, 0.02, depth / 2]}
+          position={[0, height, -depth / 2]}
+        />
       </RigidBody>
 
-      {/* Right Post Collider */}
-      <RigidBody type="fixed" colliders="cuboid" position={[width / 2, height / 2, 0]}>
-        <mesh visible={false}>
-          <cylinderGeometry args={[postRadius, postRadius, height, 8]} />
-        </mesh>
-      </RigidBody>
-
-      {/* Crossbar Collider */}
-      <RigidBody
-        type="fixed"
-        colliders="cuboid"
-        position={[0, height, 0]}
-        rotation={[0, 0, Math.PI / 2]}
-      >
-        <mesh visible={false}>
-          <cylinderGeometry args={[postRadius, postRadius, width, 8]} />
-        </mesh>
-      </RigidBody>
-
-      {/* Top Left Support Collider */}
-      <RigidBody
-        type="fixed"
-        colliders="cuboid"
-        position={[-width / 2, height, -depth / 2]}
-        rotation={[Math.PI / 2, 0, 0]}
-      >
-        <mesh visible={false}>
-          <cylinderGeometry args={[postRadius, postRadius, depth, 8]} />
-        </mesh>
-      </RigidBody>
-
-      {/* Top Right Support Collider */}
-      <RigidBody
-        type="fixed"
-        colliders="cuboid"
-        position={[width / 2, height, -depth / 2]}
-        rotation={[Math.PI / 2, 0, 0]}
-      >
-        <mesh visible={false}>
-          <cylinderGeometry args={[postRadius, postRadius, depth, 8]} />
-        </mesh>
-      </RigidBody>
-
-      {/* Goal Target Sensor Trigger Volume */}
+      {/* Goal Target Sensor Trigger Volume (Shifted inside the net to avoid post contact) */}
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider
-          args={[width / 2 - postRadius * 2, height / 2, depth / 2 - postRadius * 2]}
-          position={[0, height / 2, -depth / 2]}
+          args={[
+            width / 2 - 0.20,
+            (height - 0.22) / 2,
+            (depth - 0.27) / 2
+          ]}
+          position={[
+            0,
+            height / 2 - 0.09,
+            -0.22 - (depth - 0.27) / 2
+          ]}
           sensor
           onIntersectionEnter={handleGoalCollision}
         />
