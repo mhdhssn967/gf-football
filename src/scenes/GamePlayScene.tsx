@@ -19,6 +19,7 @@ export const GamePlayScene: React.FC = () => {
   const raccoonRef = useRef<THREE.Group>(null)
   const shakeRef = useRef(0)
   const currentAngleRef = useRef(0)
+  const baseAngleRef = useRef(0)
 
   // Slingshot drag aiming refs
   const isDraggingRef = useRef(false)
@@ -70,6 +71,92 @@ export const GamePlayScene: React.FC = () => {
     }
   }, [])
 
+  const sliderStateRef = useRef({
+    angleFraction: 0,
+    powerFraction: 0,
+    isDragging: false
+  })
+
+  useEffect(() => {
+    const handleSliderAim = (e: Event) => {
+      const customEvent = e as CustomEvent<{ angleFraction: number; powerFraction: number; isDragging: boolean }>
+      const { angleFraction, powerFraction, isDragging } = customEvent.detail
+
+      if (isDragging && !isDraggingRef.current) {
+        if (footballRef.current && footballRef.current.isMoving()) return
+        isDraggingRef.current = true
+        if (controlsRef.current) {
+          controlsRef.current.enabled = false
+        }
+        // Lock initial base angle when aiming starts
+        if (raccoonRef.current && footballRef.current) {
+          const charPos = raccoonRef.current.position
+          const ballPos = footballRef.current.getPosition()
+          const toChar = new THREE.Vector3(charPos.x - ballPos.x, 0, charPos.z - ballPos.z)
+          const dist = toChar.length()
+          if (dist > 0.1) {
+            baseAngleRef.current = Math.atan2(toChar.x, toChar.z)
+          } else {
+            baseAngleRef.current = 0
+          }
+        }
+      }
+
+      sliderStateRef.current = { angleFraction, powerFraction, isDragging }
+    }
+
+    const handleSliderRelease = (e: Event) => {
+      const customEvent = e as CustomEvent<{ angleFraction: number; powerFraction: number }>
+      const { angleFraction, powerFraction } = customEvent.detail
+
+      isDraggingRef.current = false
+      if (controlsRef.current) {
+        controlsRef.current.enabled = true
+      }
+
+      window.dispatchEvent(new CustomEvent('stop-aim-ball'))
+
+      if (powerFraction > 0.05 && raccoonRef.current && footballRef.current) {
+        const sliderAngle = angleFraction * Math.PI
+        const kickAngle = baseAngleRef.current + Math.PI + sliderAngle
+
+        const minImpulse = 0.02
+        const maxImpulse = 0.13
+        const impulseMagnitude = minImpulse + (maxImpulse - minImpulse) * powerFraction
+        
+        const impulseY = impulseMagnitude * 0.15
+        const impulse = new THREE.Vector3(
+          Math.sin(kickAngle) * impulseMagnitude,
+          impulseY,
+          Math.cos(kickAngle) * impulseMagnitude
+        )
+
+        let kickName = 'kick5'
+        if (powerFraction >= 0.33 && powerFraction < 0.66) {
+          kickName = 'kick1'
+        } else if (powerFraction >= 0.66) {
+          kickName = 'kick3'
+        }
+
+        window.dispatchEvent(new CustomEvent('trigger-kick', {
+          detail: {
+            name: kickName,
+            customImpulse: impulse
+          }
+        }))
+      }
+
+      sliderStateRef.current = { angleFraction: 0, powerFraction: 0, isDragging: false }
+    }
+
+    window.addEventListener('slider-aim', handleSliderAim as EventListener)
+    window.addEventListener('slider-release', handleSliderRelease as EventListener)
+    return () => {
+      window.removeEventListener('slider-aim', handleSliderAim as EventListener)
+      window.removeEventListener('slider-release', handleSliderRelease as EventListener)
+    }
+  }, [])
+
   // Smoothly translate and orbit the camera to follow the character and align with aims
   useFrame((state, delta) => {
     if (raccoonRef.current && footballRef.current) {
@@ -84,6 +171,24 @@ export const GamePlayScene: React.FC = () => {
       let targetAngle = currentAngleRef.current
       if (dist > 0.1) {
         targetAngle = Math.atan2(toChar.x, toChar.z)
+      }
+
+      // If dragging the slider, override targetAngle to rotate camera and character accordingly
+      if (sliderStateRef.current.isDragging) {
+        const sliderAngle = sliderStateRef.current.angleFraction * Math.PI
+        targetAngle = baseAngleRef.current + sliderAngle
+
+        const targetX = ballPos.x + Math.sin(targetAngle) * 1.2
+        const targetZ = ballPos.z + Math.cos(targetAngle) * 1.2
+        const kickAngle = targetAngle + Math.PI
+
+        window.dispatchEvent(new CustomEvent('aim-ball', { 
+          detail: { 
+            angle: kickAngle, 
+            targetX, 
+            targetZ 
+          } 
+        }))
       }
 
       // Smoothly interpolate camera rotation angle using shortest-path interpolation (framerate independent, no overshoot)
@@ -147,19 +252,20 @@ export const GamePlayScene: React.FC = () => {
     }
 
     // Aiming Slingshot trajectory and ground guide dots update loop
-    if (isDraggingRef.current && footballRef.current) {
+    if (isDraggingRef.current && footballRef.current && raccoonRef.current) {
       const ballPos = footballRef.current.getPosition()
-      const dir = dragStartPointRef.current.clone().sub(dragCurrentPointRef.current)
-      const pullLength = dir.length()
+      const powerFraction = sliderStateRef.current.powerFraction
 
-      if (pullLength > 0.1) {
-        const dirNorm = dir.clone().normalize()
+      if (powerFraction > 0.01) {
+        // Calculate aiming direction
+        const sliderAngle = sliderStateRef.current.angleFraction * Math.PI
+        const kickAngle = baseAngleRef.current + Math.PI + sliderAngle
+        const dirNorm = new THREE.Vector3(Math.sin(kickAngle), 0, Math.cos(kickAngle))
 
         // Slingshot mapping: pull distance to impulse magnitude
         const minImpulse = 0.02
         const maxImpulse = 0.13
-        const t = Math.min(Math.max((pullLength - 0.5) / 3.5, 0), 1)
-        const impulseMagnitude = minImpulse + (maxImpulse - minImpulse) * t
+        const impulseMagnitude = minImpulse + (maxImpulse - minImpulse) * powerFraction
 
         // Calculate launching velocity: v0 = impulse / mass
         const mass = 0.43
@@ -173,12 +279,12 @@ export const GamePlayScene: React.FC = () => {
         const color = new THREE.Color().lerpColors(
           new THREE.Color('#22d3ee'),
           new THREE.Color('#f43f5e'),
-          t
+          powerFraction
         )
 
         // Calculate active dots count based on pull force (from 2 up to max dots)
-        const activeTrajCount = Math.round(2 + t * 13)
-        const activeGroundCount = Math.round(2 + t * 8)
+        const activeTrajCount = Math.round(2 + powerFraction * 28)
+        const activeGroundCount = Math.round(2 + powerFraction * 18)
 
         // 1. Calculate and display 3D flight trajectory curve
         trajectoryDotsRef.current.forEach((dot, index) => {
@@ -425,13 +531,10 @@ export const GamePlayScene: React.FC = () => {
           </mesh>
         </RigidBody>
 
-        {/* Invisible pointer aiming catcher plane */}
+        {/* Invisible pointer aiming catcher plane (clicks handled via slider now) */}
         <mesh
           position={[0, 0.22, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
           visible={false}
         >
           <planeGeometry args={[120, 120]} />
@@ -439,7 +542,7 @@ export const GamePlayScene: React.FC = () => {
         </mesh>
 
         {/* 3D Flight Trajectory Arc Dots (Rose red glowing spheres) */}
-        {Array.from({ length: 15 }).map((_, i) => (
+        {Array.from({ length: 30 }).map((_, i) => (
           <mesh 
             key={`traj-${i}`} 
             ref={(el) => { if (el) trajectoryDotsRef.current[i] = el }}
@@ -451,7 +554,7 @@ export const GamePlayScene: React.FC = () => {
         ))}
 
         {/* 2D Flat Ground Heading Guide Dots (Flat cyan rings) */}
-        {Array.from({ length: 10 }).map((_, i) => (
+        {Array.from({ length: 20 }).map((_, i) => (
           <mesh 
             key={`ground-${i}`} 
             ref={(el) => { if (el) groundDotsRef.current[i] = el }}
