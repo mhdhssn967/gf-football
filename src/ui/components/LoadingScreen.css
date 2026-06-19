@@ -1,0 +1,210 @@
+.loading-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle, #2e5c1e 0%, #0d2508 100%); /* Deep Forest green */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  color: #3f1e03;
+  overflow: hidden;
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.loading-bg-glow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(234, 179, 8, 0.12) 0%, rgba(0, 0, 0, 0) 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: pulse-glow 4s infinite alternate ease-in-out;
+}
+
+@keyframes pulse-glow {
+  0% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 1.1;
+  }
+}
+
+.loading-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+}
+
+.game-logo-container {
+  margin-bottom: 40px;
+}
+
+/* Gold Embossed Logo Title */
+.game-title {
+  font-size: 3rem;
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: 0.05em;
+  color: #eab308;
+  -webkit-text-stroke: 2px #451a03;
+  text-shadow: 
+    0 4px 0 #451a03,
+    0 6px 15px rgba(0, 0, 0, 0.4);
+  text-transform: uppercase;
+}
+
+.game-title .accent {
+  color: #10b981; /* Green grass tactics */
+  -webkit-text-stroke: 2px #064e3b;
+  text-shadow: 
+    0 4px 0 #064e3b,
+    0 6px 15px rgba(0, 0, 0, 0.4);
+}
+
+.game-subtitle {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #b45309;
+  letter-spacing: 0.12em;
+  margin-top: 8px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.football-spinner {
+  margin-bottom: 40px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+}
+
+.spinner-svg {
+  animation: spin 3s infinite linear;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.progress-circle {
+  transition: stroke-dashoffset 0.4s ease-out;
+}
+
+/* Progress bar matching image */
+.progress-bar-container {
+  width: 100%;
+  margin-bottom: 40px;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 24px; /* Thick bar */
+  background-color: #0f172a; /* Dark well */
+  border: 4px solid #475569; /* Slate border */
+  border-radius: 14px;
+  position: relative;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+  box-sizing: border-box;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(to bottom, #8ee128 0%, #65a30d 100%); /* Glossy green fill */
+  border-radius: 9px;
+  transition: width 0.3s ease-out;
+  position: relative;
+}
+
+.progress-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
+/* Soccer ball sliding marker on progress bar */
+.progress-ball-marker {
+  position: absolute;
+  right: -12px;
+  top: -8px;
+  font-size: 1.5rem;
+  animation: wobble 0.6s infinite ease-in-out;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  pointer-events: none;
+}
+
+@keyframes wobble {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2px) rotate(15deg); }
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: #b45309;
+  margin-top: 10px;
+  font-weight: 800;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+}
+
+/* Wooden Parchment Tip box */
+.tips-container {
+  background: #fdf5e6;
+  border: 4px solid #5c2d11; /* Wood border */
+  border-radius: 20px;
+  padding: 16px 20px;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 
+    0 10px 25px rgba(0, 0, 0, 0.35),
+    inset 0 0 10px rgba(92, 45, 17, 0.1);
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+}
+
+.tip-fade-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tip-fade-out {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.tip-header {
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #7c2d12;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.tip-text {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #582f0e;
+  margin: 0;
+  font-weight: 700;
+}

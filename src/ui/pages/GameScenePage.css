@@ -1,0 +1,419 @@
+.game-page-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #0d2508; /* Dark green backdrop matching the forest ground */
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+  color: #3f1e03;
+}
+
+.canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* HUD Overlay Layer */
+.hud-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.hud-header,
+.hud-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* HUD Interactive Buttons (Glossy Teal Circle Medallions) */
+.hud-circle-btn {
+  pointer-events: auto;
+  background: linear-gradient(to bottom, #14b8a6 0%, #0d9488 50%, #0f766e 50%, #115e59 100%);
+  border: 3px solid #042f2e;
+  border-bottom-width: 5px;
+  color: #ffffff;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  transition: transform 0.05s ease, border-bottom-width 0.05s ease;
+}
+
+.hud-circle-btn:hover {
+  filter: brightness(1.05);
+}
+
+.hud-circle-btn:active {
+  transform: translateY(2px);
+  border-bottom-width: 3px;
+}
+
+.hud-circle-btn.highlight {
+  background: linear-gradient(to bottom, #ef4444 0%, #dc2626 50%, #b91c1c 50%, #991b1b 100%);
+  border-color: #3f0707;
+}
+
+/* Level Indicator Badge (Glossy Green Grass Banner) */
+.hud-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.level-badge {
+  background: linear-gradient(to bottom, #8ee128 0%, #76c318 50%, #5ba20b 100%);
+  border: 3px solid #1c3d01;
+  border-bottom-width: 5px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+.level-num {
+  font-size: 0.8rem;
+  font-weight: 900;
+  color: #854d0e;
+  background: linear-gradient(to bottom, #fef08a 0%, #eab308 100%);
+  border: 2px solid #a16207;
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.level-name {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 2px 0 #1c3d01;
+  text-transform: uppercase;
+}
+
+/* Score Indicators (Styled like Gold Currency Counter boxes) */
+.hud-right {
+  display: flex;
+  gap: 8px;
+}
+
+.score-badge {
+  background: #1e293b; /* Slate dark box */
+  border: 3px solid #eab308; /* Gold rim border */
+  border-radius: 20px;
+  padding: 4px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 65px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.score-badge .label {
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #fbbf24;
+  letter-spacing: 0.05em;
+  margin-bottom: -2px;
+}
+
+.score-badge .val {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.score-badge.hs {
+  border-color: #fb923c; /* Orange rim for highscore */
+}
+
+.score-badge.hs .label {
+  color: #fb923c;
+}
+
+/* Kicks Remaining indicator (Styled like segmented Energy Bar) */
+.kicks-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #0f172a;
+  border: 3px solid #475569;
+  padding: 6px 14px;
+  border-radius: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), inset 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.kicks-label {
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.05em;
+}
+
+.kicks-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.kick-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #1e293b;
+  transition: all 0.2s ease;
+}
+
+.kick-dot.active {
+  background: linear-gradient(to bottom, #a3e635 0%, #65a30d 100%); /* Green battery fill */
+  box-shadow: 0 0 6px #a3e635;
+  border-color: #3f6212;
+  transform: scale(1.15);
+}
+
+.kick-dot.spent {
+  background-color: #1e293b;
+  transform: scale(0.9);
+}
+
+.quick-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Wooden Overlay Panels for Pause, Victory, and GameOver screens */
+.game-overlay-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 100;
+  background: rgba(13, 37, 8, 0.7); /* Green forest tint */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.overlay-card {
+  position: relative;
+  background: #fdf5e6; /* Parchment background */
+  border: 8px solid #5c2d11; /* Wooden Board outer frame */
+  border-radius: 28px;
+  width: 100%;
+  max-width: 330px;
+  padding: 28px 24px;
+  box-sizing: border-box;
+  text-align: center;
+  box-shadow: 
+    0 24px 50px rgba(0, 0, 0, 0.6), 
+    inset 0 0 20px rgba(92, 45, 17, 0.2);
+}
+
+/* Modals Corner Leaf Accents */
+.overlay-card::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  width: 44px;
+  height: 44px;
+  background: radial-gradient(circle, #22c55e 0%, #15803d 80%);
+  border-radius: 50% 0 50% 0;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+  z-index: 3;
+}
+
+.overlay-card::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  right: -12px;
+  width: 44px;
+  height: 44px;
+  background: radial-gradient(circle, #22c55e 0%, #15803d 80%);
+  border-radius: 0 50% 0 50%;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+  z-index: 3;
+}
+
+.animate-pop {
+  animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Title Styling with Cartoon Outlines */
+.overlay-title {
+  font-size: 2.1rem;
+  font-weight: 900;
+  margin: 0 0 10px 0;
+  color: #eab308;
+  -webkit-text-stroke: 2px #451a03;
+  text-shadow: 0 4px 0 #451a03;
+  text-transform: uppercase;
+}
+
+/* Gameover Title */
+.overlay-title.alert {
+  color: #ef4444;
+  -webkit-text-stroke: 2px #3f0707;
+  text-shadow: 0 4px 0 #3f0707;
+}
+
+/* Victory Title */
+.overlay-title.success {
+  color: #10b981;
+  -webkit-text-stroke: 2px #064e3b;
+  text-shadow: 0 4px 0 #064e3b;
+}
+
+.overlay-desc {
+  font-size: 0.95rem;
+  color: #582f0e; /* Warm dark brown description text */
+  line-height: 1.4;
+  margin: 0 0 24px 0;
+  font-weight: 800;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.overlay-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+/* Victory Star Rating (Shiny Yellow Stars) */
+.star-rating {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.star-pulse-1,
+.star-pulse-2,
+.star-pulse-3 {
+  animation: star-glow 1.5s infinite alternate ease-in-out;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.star-pulse-1 { animation-delay: 0.1s; }
+.star-pulse-2 { animation-delay: 0.3s; }
+.star-pulse-3 { animation-delay: 0.5s; }
+
+@keyframes star-glow {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)) brightness(0.95);
+  }
+  100% {
+    transform: translateY(-5px) scale(1.12);
+    filter: drop-shadow(0 4px 12px rgba(250, 204, 21, 0.8)) brightness(1.1);
+  }
+}
+
+/* Victory Parchment Stats Box */
+.overlay-stats {
+  background: #fdfaf2;
+  border: 3px solid #e4d8c2;
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: #582f0e;
+  font-weight: 800;
+  padding: 8px 0;
+}
+
+.stat-row:not(:last-child) {
+  border-bottom: 2px solid #e4d8c2;
+}
+
+.highlight-text {
+  color: #16a34a; /* Green success stats value */
+  font-weight: 900;
+}
+
+/* Floating Sidebar containing Kick Animation Buttons */
+.kick-controls-sidebar {
+  position: absolute;
+  top: 50%;
+  left: 24px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 100;
+  pointer-events: auto;
+}
+
+.kick-btn {
+  background: linear-gradient(to bottom, #fb923c 0%, #f97316 50%, #ea580c 50%, #c2410c 100%);
+  border: 3px solid #3b2314;
+  border-bottom-width: 5px;
+  border-radius: 50%;
+  color: white;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-weight: 950;
+  font-size: 1.35rem;
+  cursor: pointer;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3), inset 0 2px 0 rgba(255, 255, 255, 0.45);
+  transition: transform 0.05s ease, border-bottom-width 0.05s ease;
+}
+
+.kick-btn:hover {
+  filter: brightness(1.08);
+}
+
+.kick-btn:active {
+  transform: translateY(2px);
+  border-bottom-width: 3px;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.3), inset 0 2px 0 rgba(255, 255, 255, 0.2);
+}

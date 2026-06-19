@@ -1,0 +1,154 @@
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  outline: none;
+  box-sizing: border-box;
+  transition: transform 0.05s ease-out, border-bottom-width 0.05s ease-out, box-shadow 0.05s ease-out;
+  overflow: hidden;
+  user-select: none;
+  width: 100%;
+}
+
+.btn:active {
+  transform: translateY(4px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Button Sizes */
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+}
+
+.btn-md {
+  padding: 12px 24px;
+  font-size: 1.05rem;
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 1.25rem;
+}
+
+/* 1. PRIMARY: Glossy Green (Grass Adventure theme) */
+.btn-primary {
+  background: linear-gradient(to bottom, #8ee128 0%, #76c318 50%, #5ba20b 50%, #468105 100%);
+  color: #ffffff;
+  border: 4px solid #1c3d01;
+  border-bottom-width: 8px;
+  text-shadow: 0 3px 0 #122900;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+.btn-primary:active {
+  border-bottom-width: 4px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* 2. SECONDARY: Glossy Teal (Levels/Menu theme) */
+.btn-secondary {
+  background: linear-gradient(to bottom, #0ea5e9 0%, #0284c7 50%, #0369a1 50%, #075985 100%);
+  color: #ffffff;
+  border: 4px solid #0c1a30;
+  border-bottom-width: 8px;
+  text-shadow: 0 3px 0 #071120;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+.btn-secondary:hover {
+  filter: brightness(1.05);
+}
+
+.btn-secondary:active {
+  border-bottom-width: 4px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* 3. DANGER: Glossy Red (Close/Cancel theme) */
+.btn-danger {
+  background: linear-gradient(to bottom, #ef4444 0%, #dc2626 50%, #b91c1c 50%, #991b1b 100%);
+  color: #ffffff;
+  border: 4px solid #3f0707;
+  border-bottom-width: 8px;
+  text-shadow: 0 3px 0 #280404;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+.btn-danger:hover {
+  filter: brightness(1.05);
+}
+
+.btn-danger:active {
+  border-bottom-width: 4px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* 4. WOOD: Glossy Embossed Wood (Shop/Settings theme) */
+.btn-wood {
+  background: linear-gradient(to bottom, #d97706 0%, #b45309 50%, #92400e 50%, #78350f 100%);
+  color: #ffffff;
+  border: 4px solid #381504;
+  border-bottom-width: 8px;
+  text-shadow: 0 3px 0 #1f0b02;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+.btn-wood:hover {
+  filter: brightness(1.05);
+}
+
+.btn-wood:active {
+  border-bottom-width: 4px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* 5. GHOST: Fallback plain border styling */
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  border: 3px dashed rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: #ffffff;
+}
+
+/* Specular Shine/Gloss Overlay */
+.btn-shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
+.btn-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
