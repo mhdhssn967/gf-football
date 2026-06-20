@@ -25,10 +25,6 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
   const isWalkingBackRef = useRef(false)
   const currentRotationYRef = useRef(rotationY)
 
-  // Running navigation refs
-  const isRunningRef = useRef(false)
-  const runTargetRef = useRef({ x: position[0], z: position[2] })
-
   // Aiming orientation refs
   const isAimingRef = useRef(false)
   const aimAngleRef = useRef(rotationY)
@@ -49,7 +45,6 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
   // Sync internal position tracking state and play initial idle animation on mount or reset
   useEffect(() => {
     basePositionRef.current = { x: position[0], y: position[1], z: position[2] }
-    isRunningRef.current = false
     isWalkingBackRef.current = false
     isKickingRef.current = false
     currentOffsetRef.current = { x: 0, z: 0 }
@@ -68,11 +63,10 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
     }
   }, [position[0], position[1], position[2], rotationY, actions])
 
-  // Listen for reset-game event to return raccoon back to starting position
+  // Listen for reset-game or reset-raccoon event to return raccoon back to starting position
   useEffect(() => {
     const handleResetGame = () => {
       basePositionRef.current = { x: position[0], y: position[1], z: position[2] }
-      isRunningRef.current = false
       isWalkingBackRef.current = false
       isKickingRef.current = false
       currentOffsetRef.current = { x: 0, z: 0 }
@@ -85,17 +79,16 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
       }
     }
     window.addEventListener('reset-game', handleResetGame)
+    window.addEventListener('reset-raccoon', handleResetGame)
     return () => {
       window.removeEventListener('reset-game', handleResetGame)
+      window.removeEventListener('reset-raccoon', handleResetGame)
     }
   }, [position[0], position[1], position[2], rotationY, actions])
 
   // Trigger specific kick animation when the trigger-kick event is dispatched
   useEffect(() => {
     const handleTriggerKick = (e: Event) => {
-      // Do not allow kicking while running towards the ball
-      if (isRunningRef.current) return
-
       const customEvent = e as CustomEvent<{ name: string }>
       const kickName = customEvent.detail?.name
       
@@ -158,7 +151,7 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
     }
   }, [actions, mixer])
 
-  // Listen for ball stopping event to run towards the new position
+  // Listen for ball stopping event to teleport to the new position
   useEffect(() => {
     const handleRunToBall = (e: Event) => {
       const customEvent = e as CustomEvent<{ x: number; z: number }>
@@ -168,29 +161,19 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
       const targetX = x
       const targetZ = z + 1.2
 
-      const dx = targetX - basePositionRef.current.x
-      const dz = targetZ - basePositionRef.current.z
-      const dist = Math.hypot(dx, dz)
+      // Teleport instantly
+      basePositionRef.current = { x: targetX, y: basePositionRef.current.y, z: targetZ }
+      currentOffsetRef.current = { x: 0, z: 0 }
+      targetOffsetRef.current = { x: 0, z: 0 }
+      isWalkingBackRef.current = false
 
-      if (dist > 0.05) {
-        // Cancel any active slide-back compensation to run from current location
-        isWalkingBackRef.current = false
-        currentOffsetRef.current = { x: 0, z: 0 }
-        targetOffsetRef.current = { x: 0, z: 0 }
+      // Face down-field once arrived
+      idleRotationRef.current = rotationY
+      currentRotationYRef.current = rotationY
 
-        runTargetRef.current = { x: targetX, z: targetZ }
-        isRunningRef.current = true
-
-        // Transition from current pose to the run animation loop
-        const runAction = actions['run']
-        const idleAction = actions['idle']
-        if (runAction && idleAction) {
-          runAction.setEffectiveTimeScale(1.0)
-          runAction.setEffectiveWeight(1.0)
-          runAction.reset()
-          idleAction.crossFadeTo(runAction, 0.25, false)
-          runAction.play()
-        }
+      const idleAction = actions['idle']
+      if (idleAction) {
+        idleAction.reset().play()
       }
     }
 
@@ -198,7 +181,7 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
     return () => {
       window.removeEventListener('run-to-ball', handleRunToBall as EventListener)
     }
-  }, [actions])
+  }, [actions, rotationY])
 
   // Listen for aiming event to face the pull/aim direction in real-time
   useEffect(() => {
@@ -221,46 +204,11 @@ export const Raccoon: React.FC<RaccoonProps> = ({ position, rotationY = 0, scale
     }
   }, [])
 
-  // Frame loop for smooth position interpolation & running mechanics
+  // Frame loop for smooth position interpolation & movement constraints
   useFrame((_state, delta) => {
     let targetRotation = idleRotationRef.current
 
-    // 1. Run movement tracking
-    if (isRunningRef.current) {
-      const dx = runTargetRef.current.x - basePositionRef.current.x
-      const dz = runTargetRef.current.z - basePositionRef.current.z
-      const distance = Math.hypot(dx, dz)
-
-      if (distance > 0.05) {
-        // Character run speed (meters per second)
-        const runSpeed = 2.4
-        const step = Math.min(distance, runSpeed * delta)
-        basePositionRef.current.x += (dx / distance) * step
-        basePositionRef.current.z += (dz / distance) * step
-
-        // Calculate rotation angle to face running vector
-        targetRotation = Math.atan2(dx, dz)
-      } else {
-        // Arrived at destination
-        basePositionRef.current.x = runTargetRef.current.x
-        basePositionRef.current.z = runTargetRef.current.z
-        isRunningRef.current = false
-
-        // Face down-field once arrived at the ball to ready for the next shot
-        idleRotationRef.current = rotationY
-        targetRotation = rotationY
-
-        // Transition from run back to standing idle pose
-        const runAction = actions['run']
-        const idleAction = actions['idle']
-        if (runAction && idleAction) {
-          idleAction.setEffectiveTimeScale(1)
-          idleAction.setEffectiveWeight(1)
-          runAction.crossFadeTo(idleAction, 0.25, false)
-          idleAction.reset().play()
-        }
-      }
-    } else if (isAimingRef.current) {
+    if (isAimingRef.current) {
       // Smoothly orbit/pivot around the ball
       basePositionRef.current.x += (aimTargetXRef.current - basePositionRef.current.x) * 12 * delta
       basePositionRef.current.z += (aimTargetZRef.current - basePositionRef.current.z) * 12 * delta

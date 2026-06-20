@@ -159,12 +159,13 @@ export const Football: React.FC<FootballProps> = ({
         colliders={false} // Use explicit SphereCollider below
         position={position}
         mass={0.43}
-        restitution={0.75} // bounce factor
+        restitution={0.85} // bounce factor
         friction={0.4} // roll friction
-        linearDamping={0.8} // grass resistance
-        angularDamping={0.8}
+        linearDamping={0.25} // grass resistance
+        angularDamping={0.25}
         name="football"
         ccd={true}
+        enabledTranslations={[true, true, true]}
         onCollisionEnter={handleBallCollision}
       >
         <BallCollider args={[0.11]} />

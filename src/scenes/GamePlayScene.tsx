@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useEffect } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { OrbitControls, useTexture, Sky, Stars } from '@react-three/drei'
@@ -64,8 +64,6 @@ export const GamePlayScene: React.FC = () => {
     isMoving: () => boolean
   }>(null)
   const raccoonRef = useRef<THREE.Group>(null)
-  const shakeRef = useRef(0)
-  const currentAngleRef = useRef(0)
   const baseAngleRef = useRef(0)
 
   // Slingshot drag aiming refs
@@ -88,34 +86,49 @@ export const GamePlayScene: React.FC = () => {
   const cameraRef = useRef<THREE.Camera | null>(null)
 
   // Set the camera directly behind and above the character position
-  useLayoutEffect(() => {
+  useEffect(() => {
     cameraRef.current = camera
-    camera.position.set(0, 8.0, 7.5)
-    camera.lookAt(0, 0.5, -1.0)
+    camera.position.set(0.0, 12.5, 18.5)
+    camera.lookAt(0.0, -2.5, -1.5)
     camera.updateProjectionMatrix()
+    if (controlsRef.current) {
+      controlsRef.current.target.set(0.0, -2.5, -1.5)
+      controlsRef.current.update()
+    }
   }, [camera])
 
-  // Listen for wall hit events to trigger camera shake
-  useEffect(() => {
-    const handleWallHit = () => {
-      shakeRef.current = 0.25
-    }
-    window.addEventListener('wall-hit', handleWallHit)
-    return () => {
-      window.removeEventListener('wall-hit', handleWallHit)
-    }
-  }, [])
+  const [balls, setBalls] = React.useState<Array<{
+    id: string
+    position: [number, number, number]
+    isActive: boolean
+  }>>([])
 
-  // Listen for reset-game to reset camera angle
+  // Initialize/reset the balls array
+  const initBalls = React.useCallback(() => {
+    setBalls([
+      {
+        id: `ball-${Date.now()}-0`,
+        position: [currentLevel.ballStartPos[0], 5.0, currentLevel.ballStartPos[2]],
+        isActive: true
+      }
+    ])
+  }, [currentLevel])
+
+  // Handle level change
+  useEffect(() => {
+    initBalls()
+  }, [currentLevelIndex, initBalls])
+
+  // Handle reset-game event
   useEffect(() => {
     const handleReset = () => {
-      currentAngleRef.current = 0
+      initBalls()
     }
     window.addEventListener('reset-game', handleReset)
     return () => {
       window.removeEventListener('reset-game', handleReset)
     }
-  }, [])
+  }, [initBalls])
 
   const sliderStateRef = useRef({
     angleFraction: 0,
@@ -166,14 +179,13 @@ export const GamePlayScene: React.FC = () => {
         const sliderAngle = angleFraction * Math.PI
         const kickAngle = baseAngleRef.current + Math.PI + sliderAngle
 
-        const minImpulse = 0.02
-        const maxImpulse = 0.13
+        const minImpulse = 0.04
+        const maxImpulse = 0.42
         const impulseMagnitude = minImpulse + (maxImpulse - minImpulse) * powerFraction
         
-        const impulseY = impulseMagnitude * 0.15
         const impulse = new THREE.Vector3(
           Math.sin(kickAngle) * impulseMagnitude,
-          impulseY,
+          0,
           Math.cos(kickAngle) * impulseMagnitude
         )
 
@@ -203,26 +215,13 @@ export const GamePlayScene: React.FC = () => {
     }
   }, [])
 
-  // Smoothly translate and orbit the camera to follow the character and align with aims
-  useFrame((state, delta) => {
+  // Handle character aiming orbit when slider is dragged (camera position is fixed)
+  useFrame((state) => {
     if (raccoonRef.current && footballRef.current) {
-      const charPos = raccoonRef.current.position
-      const ballPos = footballRef.current.getPosition()
-
-      // Calculate vector from ball to character on ground plane
-      const toChar = new THREE.Vector3(charPos.x - ballPos.x, 0, charPos.z - ballPos.z)
-      const dist = toChar.length()
-
-      // Determine target angle, keeping the previous angle if the distance is too small to avoid spinning
-      let targetAngle = currentAngleRef.current
-      if (dist > 0.1) {
-        targetAngle = Math.atan2(toChar.x, toChar.z)
-      }
-
-      // If dragging the slider, override targetAngle to rotate camera and character accordingly
       if (sliderStateRef.current.isDragging) {
+        const ballPos = footballRef.current.getPosition()
         const sliderAngle = sliderStateRef.current.angleFraction * Math.PI
-        targetAngle = baseAngleRef.current + sliderAngle
+        const targetAngle = baseAngleRef.current + sliderAngle
 
         const targetX = ballPos.x + Math.sin(targetAngle) * 1.2
         const targetZ = ballPos.z + Math.cos(targetAngle) * 1.2
@@ -235,65 +234,6 @@ export const GamePlayScene: React.FC = () => {
             targetZ 
           } 
         }))
-      }
-
-      // Smoothly interpolate camera rotation angle using shortest-path interpolation (framerate independent, no overshoot)
-      let angleDiff = targetAngle - currentAngleRef.current
-      angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff))
-      currentAngleRef.current += angleDiff * Math.min(1.0, 10.0 * delta)
-
-      // Reconstruct smooth direction vector from the angle
-      const dirX = Math.sin(currentAngleRef.current)
-      const dirZ = Math.cos(currentAngleRef.current)
-
-      // Update OrbitControls lookAt target position (2.2 meters in front of the raccoon towards the ball/field)
-      const targetLookAtX = charPos.x - dirX * 2.2
-      const targetLookAtY = charPos.y + 0.5
-      const targetLookAtZ = charPos.z - dirZ * 2.2
-
-      // Camera position: positioned behind character (away from the ball)
-      const targetCamX = charPos.x + dirX * 6.3
-      const targetCamY = charPos.y + 7.78
-      const targetCamZ = charPos.z + dirZ * 6.3
-
-      const controls = state.controls as { target: THREE.Vector3; update: () => void; enabled: boolean } | null
-      const t = Math.min(1.0, 12.0 * delta)
-
-      if (controls) {
-        // Calculate the translation delta for the controls target
-        controls.target.x += (targetLookAtX - controls.target.x) * t
-        controls.target.y += (targetLookAtY - controls.target.y) * t
-        controls.target.z += (targetLookAtZ - controls.target.z) * t
-
-        state.camera.position.x += (targetCamX - state.camera.position.x) * t
-        state.camera.position.y += (targetCamY - state.camera.position.y) * t
-        state.camera.position.z += (targetCamZ - state.camera.position.z) * t
-
-        controls.update()
-
-        // Apply transient camera shake after OrbitControls update so it doesn't cause position drift
-        if (shakeRef.current > 0) {
-          state.camera.position.x += (Math.random() - 0.5) * shakeRef.current
-          state.camera.position.y += (Math.random() - 0.5) * shakeRef.current
-          state.camera.position.z += (Math.random() - 0.5) * shakeRef.current
-          shakeRef.current = Math.max(0, shakeRef.current - 1.5 * delta)
-        }
-      } else {
-        // Fallback camera positioning if controls are not loaded yet
-        let shakeOffsetX = 0
-        let shakeOffsetY = 0
-        let shakeOffsetZ = 0
-        if (shakeRef.current > 0) {
-          shakeOffsetX = (Math.random() - 0.5) * shakeRef.current
-          shakeOffsetY = (Math.random() - 0.5) * shakeRef.current
-          shakeOffsetZ = (Math.random() - 0.5) * shakeRef.current
-          shakeRef.current = Math.max(0, shakeRef.current - 1.5 * delta)
-        }
-
-        state.camera.position.x += (targetCamX - state.camera.position.x) * t + shakeOffsetX
-        state.camera.position.y += (targetCamY - state.camera.position.y) * t + shakeOffsetY
-        state.camera.position.z += (targetCamZ - state.camera.position.z) * t + shakeOffsetZ
-        state.camera.lookAt(targetLookAtX, targetLookAtY, targetLookAtZ)
       }
     }
 
@@ -309,15 +249,15 @@ export const GamePlayScene: React.FC = () => {
         const dirNorm = new THREE.Vector3(Math.sin(kickAngle), 0, Math.cos(kickAngle))
 
         // Slingshot mapping: pull distance to impulse magnitude
-        const minImpulse = 0.02
-        const maxImpulse = 0.13
+        const minImpulse = 0.04
+        const maxImpulse = 0.42
         const impulseMagnitude = minImpulse + (maxImpulse - minImpulse) * powerFraction
 
         // Calculate launching velocity: v0 = impulse / mass
         const mass = 0.43
         const v0 = new THREE.Vector3(
           (dirNorm.x * impulseMagnitude) / mass,
-          (impulseMagnitude * 0.15) / mass,
+          0,
           (dirNorm.z * impulseMagnitude) / mass
         )
 
@@ -334,7 +274,7 @@ export const GamePlayScene: React.FC = () => {
 
         // 1. Calculate and display 3D flight trajectory curve (with recursive bouncing!)
         const raycaster = raycasterRef.current
-        const bounciness = 0.55 // Restitution of the ball
+        const bounciness = 0.85 // Restitution of the ball
         const ballRadius = 0.11
 
         let currentPos = ballPos.clone()
@@ -427,8 +367,8 @@ export const GamePlayScene: React.FC = () => {
           if (currentPos.y < ballRadius) {
             currentPos.y = ballRadius
             currentVel.y = -currentVel.y * bounciness
-            currentVel.x *= 0.9
-            currentVel.z *= 0.9
+            currentVel.x *= 0.98
+            currentVel.z *= 0.98
           }
 
           computedPositions.push(currentPos.clone())
@@ -574,11 +514,11 @@ export const GamePlayScene: React.FC = () => {
         enableRotate={false}
         minDistance={5}
         maxDistance={25}
-        target={[0, 0.5, -1.0]}
+        target={[0.0, -2.5, -1.5]}
       />
 
       {/* R3F Rapier Physics World */}
-      <Physics>
+      <Physics gravity={[0, -25, 0]}>
         {/* Sky, atmosphere & warm sunset lights */}
         <Sky 
           distance={450000} 
@@ -660,13 +600,13 @@ export const GamePlayScene: React.FC = () => {
 
         {/* Enclosing boundary walls (neon glowing glass borders with high bounciness) */}
         {/* Left Wall */}
-        <BoundaryWall position={[-15.1, 1.0, 0]} args={[0.2, 2.0, 45.0]} color="#22d3ee" glowColor="#06b6d4" />
+        <BoundaryWall position={[-16.0, 5.0, 0]} args={[2.0, 10.0, 47.0]} color="#22d3ee" glowColor="#06b6d4" />
         {/* Right Wall */}
-        <BoundaryWall position={[15.1, 1.0, 0]} args={[0.2, 2.0, 45.0]} color="#22d3ee" glowColor="#06b6d4" />
+        <BoundaryWall position={[16.0, 5.0, 0]} args={[2.0, 10.0, 47.0]} color="#22d3ee" glowColor="#06b6d4" />
         {/* Top Wall */}
-        <BoundaryWall position={[0, 1.0, -22.6]} args={[30.4, 2.0, 0.2]} color="#f43f5e" glowColor="#e11d48" />
+        <BoundaryWall position={[0, 5.0, -23.5]} args={[34.0, 10.0, 2.0]} color="#f43f5e" glowColor="#e11d48" />
         {/* Bottom Wall */}
-        <BoundaryWall position={[0, 1.0, 22.6]} args={[30.4, 2.0, 0.2]} color="#f43f5e" glowColor="#e11d48" />
+        <BoundaryWall position={[0, 5.0, 23.5]} args={[34.0, 10.0, 2.0]} color="#f43f5e" glowColor="#e11d48" />
 
         {/* Level 3D Environment (Forest, path, bridge, river, and flags) */}
         <GameEnvironment />
@@ -687,23 +627,41 @@ export const GamePlayScene: React.FC = () => {
           scale={0.8}
         />
 
-        {/* 2. Physics-Simulated Soccer Ball */}
-        <Football 
-          ref={footballRef} 
-          position={[currentLevel.ballStartPos[0], 0.22, currentLevel.ballStartPos[2]]} 
-          onStop={(ballPos) => {
-            window.dispatchEvent(new CustomEvent('run-to-ball', { detail: { x: ballPos.x, z: ballPos.z } }))
-            
-            // Check if player ran out of kicks and hasn't scored
-            setTimeout(() => {
-              const currentPhase = useGameStore.getState().phase
-              const kicks = useGameStore.getState().kicksRemaining
-              if (currentPhase === 'PLAYING' && kicks === 0) {
-                useGameStore.getState().setPhase('GAMEOVER')
-              }
-            }, 1200) // Small delay to let raccoon approach the ball first
-          }}
-        />
+        {/* 2. Physics-Simulated Soccer Balls */}
+        {balls.map((ball) => (
+          <Football 
+            key={ball.id}
+            ref={ball.isActive ? footballRef : null} 
+            position={ball.position} 
+            onStop={ball.isActive ? () => {
+              // Check if player ran out of kicks and hasn't scored
+              setTimeout(() => {
+                const currentPhase = useGameStore.getState().phase
+                const kicks = useGameStore.getState().kicksRemaining
+                if (currentPhase === 'PLAYING') {
+                  if (kicks === 0) {
+                    useGameStore.getState().setPhase('GAMEOVER')
+                  } else {
+                    // Give another ball by adding it to the state (falling from Y = 5.0)
+                    setBalls((prev) => {
+                      const updated = prev.map(b => ({ ...b, isActive: false }))
+                      return [
+                        ...updated,
+                        {
+                          id: `ball-${Date.now()}-${updated.length}`,
+                          position: [currentLevel.ballStartPos[0], 5.0, currentLevel.ballStartPos[2]],
+                          isActive: true
+                        }
+                      ]
+                    })
+                    // Reset raccoon position and animation back to default starting stance
+                    window.dispatchEvent(new CustomEvent('reset-raccoon'))
+                  }
+                }
+              }, 300) // Small delay for visual feedback after the ball stops
+            } : undefined}
+          />
+        ))}
 
       </Physics>
     </>

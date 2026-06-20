@@ -39,11 +39,12 @@ export const BoundaryWall: React.FC<BoundaryWallProps> = ({
       name="wall"
       type="fixed" 
       colliders="cuboid" 
+      position={position}
       restitution={0.9} 
       friction={0.1}
       onCollisionEnter={handleCollision}
     >
-      <mesh ref={meshRef} position={position} castShadow receiveShadow>
+      <mesh ref={meshRef} castShadow receiveShadow>
         <boxGeometry args={args} />
         {/* Futuristic glowing transparent glass material */}
         <meshStandardMaterial 
